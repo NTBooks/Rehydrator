@@ -1,0 +1,14 @@
+{
+  "name": "rehydrator",
+  "version": "1.0.0",
+  "description": "Console app to examine UpdateMapping calls from a contract",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "viem": "^2.0.0",
+    "dotenv": "^16.4.5"
+  }
+}

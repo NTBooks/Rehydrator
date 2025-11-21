@@ -1,0 +1,121 @@
+import { writeFile, mkdir, readFile, readdir } from 'fs/promises';
+import { join } from 'path';
+import {
+    DATA_DIR_PATH,
+    LAST_BLOCK_FILE,
+    RESULTS_CSV_FILE,
+    BLOCK_FILE_PREFIX,
+    BLOCK_FILE_SUFFIX
+} from './constants.js';
+
+export async function saveLastBlock(blockNumber) {
+    try {
+        await mkdir(DATA_DIR_PATH, { recursive: true });
+        await writeFile(LAST_BLOCK_FILE, blockNumber.toString(), 'utf8');
+    } catch (error) {
+        console.error(`Warning: Failed to save last block: ${error.message}`);
+    }
+}
+
+export async function loadLastBlock() {
+    try {
+        const content = await readFile(LAST_BLOCK_FILE, 'utf8');
+        const blockNumber = BigInt(content.trim());
+        return blockNumber;
+    } catch (error) {
+        return null;
+    }
+}
+
+export async function loadExistingEvents() {
+    try {
+        const files = await readdir(DATA_DIR_PATH);
+        const blockFiles = files.filter(f => f.startsWith(BLOCK_FILE_PREFIX) && f.endsWith(BLOCK_FILE_SUFFIX));
+
+        if (blockFiles.length === 0) {
+            return [];
+        }
+
+        console.log(`Loading ${blockFiles.length} existing block file(s)...`);
+        const allEvents = [];
+
+        for (const file of blockFiles) {
+            try {
+                const filePath = join(DATA_DIR_PATH, file);
+                const content = await readFile(filePath, 'utf8');
+                const events = JSON.parse(content);
+
+                for (const event of events) {
+                    if (event.blockNumber) event.blockNumber = BigInt(event.blockNumber);
+                    if (event.logIndex !== undefined) event.logIndex = BigInt(event.logIndex);
+                    if (event.transactionIndex !== undefined) event.transactionIndex = BigInt(event.transactionIndex);
+                    if (event.timestamp) event.timestamp = new Date(event.timestamp);
+                    allEvents.push(event);
+                }
+            } catch (error) {
+                console.error(`Warning: Failed to load ${file}: ${error.message}`);
+            }
+        }
+
+        console.log(`Loaded ${allEvents.length} existing events from saved files.`);
+        return allEvents;
+    } catch (error) {
+        console.error(`Warning: Failed to load existing events: ${error.message}`);
+        return [];
+    }
+}
+
+export async function saveBlockEvents(blockNumber, events) {
+    try {
+        await mkdir(DATA_DIR_PATH, { recursive: true });
+        const filename = join(DATA_DIR_PATH, `${BLOCK_FILE_PREFIX}${blockNumber}${BLOCK_FILE_SUFFIX}`);
+        await writeFile(filename, JSON.stringify(events, null, 2), 'utf8');
+    } catch (error) {
+        console.error(`Warning: Failed to save block events: ${error.message}`);
+    }
+}
+
+export async function saveResultsToCSV(events) {
+    try {
+        if (events.length === 0) return;
+
+        const headers = ['TransactionHash', 'BlockNumber', 'Timestamp', 'CID'];
+        const rows = [headers.join(',')];
+
+        for (const event of events) {
+            const txHash = event.transactionHash || '';
+            const blockNumber = event.blockNumber?.toString() || '';
+            const timestamp = event.timestamp
+                ? (event.timestamp instanceof Date
+                    ? event.timestamp.toISOString()
+                    : event.timestamp)
+                : '';
+            const cid = event.args?.value || event.args?.[0] || event.data || '';
+
+            const row = [
+                escapeCSV(txHash),
+                escapeCSV(blockNumber),
+                escapeCSV(timestamp),
+                escapeCSV(cid)
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        await mkdir(DATA_DIR_PATH, { recursive: true });
+        await writeFile(RESULTS_CSV_FILE, csvContent, 'utf8');
+        console.log(`\nSaved ${events.length} results to ${RESULTS_CSV_FILE}`);
+    } catch (error) {
+        console.error(`Warning: Failed to save results CSV: ${error.message}`);
+    }
+}
+
+function escapeCSV(value) {
+    if (value === null || value === undefined) return '';
+    const stringValue = String(value);
+    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return stringValue;
+}
+
