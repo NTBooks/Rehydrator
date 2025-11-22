@@ -14,12 +14,22 @@ export async function processAndSaveChunkEvents(logs, actions) {
     if (logs.length === 0) return [];
 
     try {
-        const eventsWithTimestamps = [];
-        for (const log of logs) {
-            const block = await actions.getBlock({ blockNumber: log.blockNumber });
+        // Collect unique block numbers to avoid fetching the same block multiple times
+        const uniqueBlockNumbers = [...new Set(logs.map(log => log.blockNumber))];
+        
+        // Fetch timestamps for unique blocks sequentially (to avoid rate limits)
+        const blockTimestampMap = new Map();
+        for (const blockNumber of uniqueBlockNumbers) {
+            const block = await actions.getBlock({ blockNumber });
             const timestamp = new Date(Number(block.timestamp) * 1000);
-            eventsWithTimestamps.push({ ...log, timestamp });
+            blockTimestampMap.set(blockNumber, timestamp);
         }
+        
+        // Apply timestamps to events using the cached map
+        const eventsWithTimestamps = logs.map(log => ({
+            ...log,
+            timestamp: blockTimestampMap.get(log.blockNumber)
+        }));
 
         const eventsByBlock = {};
         for (const event of eventsWithTimestamps) {

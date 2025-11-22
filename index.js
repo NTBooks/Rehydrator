@@ -13,6 +13,10 @@ const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || '0xcb845a74503FF0c0bF85
 const STARTING_BLOCK = BigInt(process.env.STARTING_BLOCK || '30974622');
 const CHAIN = process.env.CHAIN || 'base';
 
+// Check for command line arguments
+const args = process.argv.slice(2);
+const isFullMode = args.includes('full');
+
 async function loadLastBlock() {
     try {
         const content = await readFile(LAST_BLOCK_FILE, 'utf8');
@@ -45,12 +49,17 @@ async function getUpdateMappingEvents() {
     if (lastBlock !== STARTING_BLOCK) {
         console.log(`Resuming from saved block: ${lastBlock}`);
     }
-    console.log(`Chain: ${CHAIN}\n`);
+    console.log(`Chain: ${CHAIN}`);
+    if (isFullMode) {
+        console.log('Mode: FULL (will download asset CIDs from parsed files)\n');
+    } else {
+        console.log('Mode: STANDARD\n');
+    }
 
     try {
         // Call getHistory with the contract address and original starting block
         // getHistory will handle resuming from saved block internally
-        const history = await courier.getHistory(CONTRACT_ADDRESS, STARTING_BLOCK);
+        const history = await courier.getHistory(CONTRACT_ADDRESS, STARTING_BLOCK, isFullMode);
 
         if (history.length === 0) {
             console.log('No UpdateMapping events found.');

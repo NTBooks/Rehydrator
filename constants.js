@@ -7,6 +7,7 @@ const __dirname = dirname(__filename);
 export const DATA_DIR = process.env.DATA_DIR || 'data';
 export const DATA_DIR_PATH = join(__dirname, DATA_DIR);
 export const FILES_DIR_PATH = join(__dirname, DATA_DIR, 'files');
+export const ASSETS_DIR_PATH = join(__dirname, DATA_DIR, 'files', 'assets');
 export const LAST_BLOCK_FILE = join(__dirname, DATA_DIR, 'lastblock.txt');
 export const RESULTS_CSV_FILE = join(__dirname, DATA_DIR, 'results.csv');
 

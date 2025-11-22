@@ -52,6 +52,8 @@ IPFS_GATEWAY=https://ipfs.io/ipfs # IPFS gateway URL
 
 ## Usage
 
+### Standard Mode
+
 ```bash
 npm start
 ```
@@ -62,25 +64,50 @@ Or directly:
 node index.js
 ```
 
+### Full Mode
+
+To also download CIDs parsed from inside the downloaded files (stored in `data/files/assets/`):
+
+```bash
+npm start -- full
+```
+
+Or directly:
+
+```bash
+node index.js full
+```
+
+**Note:** Full mode will:
+
+- Run the standard processing first
+- At the very end, parse all downloaded JSON files for nested CIDs
+- Download those CIDs to `data/files/assets/` directory
+- Handle IPFS rate limits (429 errors) with automatic retry and exponential backoff
+
 ## How It Works
 
 ### Step 1: Initialization
+
 - Loads configuration from environment variables
 - Checks for existing progress (`lastblock.txt`) to resume from
 - Creates a Courier instance with RPC connection management
 
 ### Step 2: Block Range Calculation
+
 - Determines the starting block (from `STARTING_BLOCK` or saved progress)
 - Gets the current blockchain block number
 - Calculates the range to scan
 
 ### Step 3: Event Querying
+
 - Queries `MappingUpdated` events in chunks (default: 10,000 blocks per chunk)
 - Processes each chunk sequentially with progress indicators
 - Handles RPC errors with automatic retry and endpoint switching
 - Saves progress after each chunk to enable resumption
 
 ### Step 4: Event Processing
+
 - For each event found:
   - Fetches the block timestamp
   - Extracts the CID (Content Identifier) from event arguments
@@ -88,12 +115,14 @@ node index.js
 - Downloads IPFS files referenced in events (with rate limiting)
 
 ### Step 5: File Download
+
 - Checks if IPFS files already exist locally
 - Downloads missing files from IPFS gateway
 - Determines file extensions based on MIME types
 - Saves files with CID-based naming
 
 ### Step 6: Summary Generation
+
 - Analyzes downloaded JSON files for nested CIDs
 - Builds a comprehensive summary of all CIDs found
 - Displays statistics including:
@@ -102,24 +131,37 @@ node index.js
   - Occurrence count
 
 ### Step 7: Export Results
+
 - Generates CSV file with all events
 - Displays formatted table in console
+
+### Step 8: Asset Download (Full Mode Only)
+
+- If running with `full` command:
+  - Parses all downloaded JSON files for nested CIDs (from `filehashes` arrays)
+  - Downloads those CIDs to `data/files/assets/` directory
+  - Handles IPFS rate limits (429 errors) with automatic retry
+  - Uses exponential backoff for rate limit retries
+  - Skips files that already exist locally
 
 ## Output Files
 
 All output files are saved in the `data/` directory (or `DATA_DIR` if specified).
 
 ### `lastblock.txt`
+
 - Contains the last processed block number
 - Used for resuming interrupted scans
 - Format: Single line with block number (e.g., `38478903`)
 
 ### `results.csv`
+
 - CSV export of all events found
 - Columns: `TransactionHash`, `BlockNumber`, `Timestamp`, `CID`
 - Useful for data analysis in spreadsheet applications
 
 ### `block_<NUMBER>.json`
+
 - Individual JSON files for each block containing events
 - One file per block that had events
 - Contains full event data including:
@@ -129,10 +171,19 @@ All output files are saved in the `data/` directory (or `DATA_DIR` if specified)
   - Log index and other metadata
 
 ### `files/<CID>.<extension>`
-- Downloaded IPFS files
+
+- Downloaded IPFS files from events
 - Files are named using their CID with appropriate extensions
 - Extensions determined by MIME type (`.json`, `.jpg`, `.png`, etc.)
 - If a file already exists, it's skipped to avoid re-downloading
+
+### `files/assets/<CID>.<extension>` (Full Mode Only)
+
+- Downloaded IPFS asset files parsed from JSON files
+- Contains CIDs found in `filehashes` arrays within downloaded JSON files
+- Only created when running with `full` command
+- Same naming convention as main files directory
+- Includes automatic retry logic for IPFS rate limits (429 errors)
 
 ## Example Output
 
@@ -154,9 +205,9 @@ Starting from block: 30974622
 
 CID Summary:
 ========================================================================================================================
-CID                                                  EARLIEST BLOCK    TIMESTAMP                  COUNT      
+CID                                                  EARLIEST BLOCK    TIMESTAMP                  COUNT
 ========================================================================================================================
-QmZurDxJuAFYQmuM67m1iPaYTrT2QABHYSuisRkmBx6hbD      31094360          2025-06-03 19:14:27        1          
+QmZurDxJuAFYQmuM67m1iPaYTrT2QABHYSuisRkmBx6hbD      31094360          2025-06-03 19:14:27        1
 ...
 
 Total unique CIDs: 15
@@ -166,6 +217,7 @@ Total occurrences: 32
 ## Resuming Interrupted Scans
 
 If the program is interrupted, simply run it again. It will automatically:
+
 - Detect the last processed block from `lastblock.txt`
 - Load existing events from `block_*.json` files
 - Continue from where it left off
@@ -202,8 +254,9 @@ If the program is interrupted, simply run it again. It will automatically:
 - RPC endpoints are managed with automatic failover and retry logic
 - IPFS downloads are rate-limited to avoid overwhelming gateways
 - All BigInt values are properly serialized for JSON output
+- Full mode handles IPFS rate limits (429 errors) with exponential backoff retry logic
+- Asset downloads in full mode respect the `Retry-After` header when provided
 
 ## Contributing
 
 This project is not actively maintained. Feel free to fork and modify as needed for your own use case.
-

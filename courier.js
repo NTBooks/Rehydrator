@@ -4,7 +4,7 @@ import * as chains from 'viem/chains';
 import { createRpcManager } from './rpc-manager.js';
 import { withRetry } from './retry-utils.js';
 import { loadLastBlock, loadExistingEvents, saveLastBlock, saveResultsToCSV } from './file-io.js';
-import { downloadCIDsFromEvents } from './ipfs-downloader.js';
+import { downloadCIDsFromEvents, downloadCIDsToAssets } from './ipfs-downloader.js';
 import { processAndSaveChunkEvents } from './event-processor.js';
 import { buildAndPrintCIDSummary } from './summary-builder.js';
 import {
@@ -142,7 +142,7 @@ export function createCourier(chain, privateKey, rpc) {
         }
     };
 
-    const getHistory = async (contractAddress, startingBlock) => {
+    const getHistory = async (contractAddress, startingBlock, isFullMode = false) => {
         console.time('timer');
         try {
             return await withRetry(async () => {
@@ -185,6 +185,12 @@ export function createCourier(chain, privateKey, rpc) {
 
                 await buildAndPrintCIDSummary(data);
                 await saveResultsToCSV(data);
+                
+                // If full mode is enabled, download asset CIDs from parsed files
+                if (isFullMode) {
+                    await downloadCIDsToAssets();
+                }
+                
                 return data;
             }, courier);
         } finally {
